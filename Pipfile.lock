@@ -1,7 +1,7 @@
 {
     "_meta": {
         "hash": {
-            "sha256": "55ca4ed65b79da7551729e2498b4fc8a66892bedcd71422cd2dea57fa808b97f"
+            "sha256": "e25bfc5ba76ef67cb92cfb3d2e8a8cb5073c6c56bc9147843274459e9fcb2491"
         },
         "pipfile-spec": 6,
         "requires": {
@@ -188,9 +188,10 @@
         },
         "keras": {
             "hashes": [
-                "sha256:26a6e2c2522e7468ddea22710a99b3290493768fc08a39e75d1173a0e3452fdf"
+                "sha256:504af5656a9829fe803ce48a8580ef16916e89906aceddad9e098614269437e7"
             ],
-            "version": "==2.10.0"
+            "index": "pypi",
+            "version": "==2.6.0"
         },
         "keras-preprocessing": {
             "hashes": [
@@ -198,6 +199,14 @@
                 "sha256:add82567c50c8bc648c14195bf544a5ce7c1f76761536956c3d2978970179ef3"
             ],
             "version": "==1.1.2"
+        },
+        "keras-rl2": {
+            "hashes": [
+                "sha256:1a31d16e212ff3e01b904d42c3b3961b588841d1b2563b5ac51ed9b936ec7be3",
+                "sha256:296e758bf4660531f51927c4fae983538a7b8bfd9f92b1082433ed44baff9aef"
+            ],
+            "index": "pypi",
+            "version": "==1.0.5"
         },
         "markdown": {
             "hashes": [
@@ -405,7 +414,7 @@
                 "sha256:30639c035cdb23534cd4aa2dd52c3bf48f06e5f4a941509c8bafd8ce11080259",
                 "sha256:8b74bedcbbbaca38ff6d7491d76f2b06b3592611af620f8426e82dddb04a5ced"
             ],
-            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2, 3.3'",
+            "markers": "python_version >= '2.7' and python_version not in '3.0, 3.1, 3.2'",
             "version": "==1.15.0"
         },
         "tensorboard": {
@@ -554,7 +563,7 @@
                 "sha256:806143ae5bfb6a3c6e736a764057db0e6a0e05e338b5630894a5f779cabb4f9b",
                 "sha256:b3bda1d108d5dd99f4a20d24d9c348e91c4db7ab1b749200bded2f839ccbe68f"
             ],
-            "markers": "python_version >= '2.6' and python_version not in '3.0, 3.1, 3.2, 3.3'",
+            "markers": "python_version >= '2.6' and python_version not in '3.0, 3.1, 3.2'",
             "version": "==0.10.2"
         }
     }
