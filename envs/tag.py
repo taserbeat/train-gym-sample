@@ -3,6 +3,15 @@ from gym import spaces
 import pygame
 import numpy as np
 import random
+from tensorflow.keras.models import Sequential, load_model
+from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.optimizers import Adam
+from rl.memory import SequentialMemory
+from rl.policy import BoltzmannQPolicy
+from rl.agents.dqn import DQNAgent
+import os
+import pathlib
+
 import typing as t
 
 
@@ -31,13 +40,16 @@ class TagSimpleGame(gym.Env):
     """
 
     # 共通パラメータ
-    FIELD_X_MIN, FILED_X_MAX = 0, 400  # フィールドのx座標範囲
-    FIELD_Y_MIN, FIELD_Y_MAX = 100, 400  # フィールドのy座標範囲
+    FIELD_X_MIN, FILED_X_MAX = 0, 100  # フィールドのx座標範囲
+    FIELD_Y_MIN, FIELD_Y_MAX = 100, 200  # フィールドのy座標範囲
+
+    BOUNDARY_Y = int((FIELD_Y_MAX + FIELD_Y_MIN) / 2)  # 鬼はこのy座標以上で初期化され、逃走者はこのy座標以下で初期化される
+
     FPS = 60  # ゲームのフレームレート
     TIME_LIMIT_SEC = 10  # 1ゲームあたりの制限時間 [単位: 秒]
 
-    RADIUS = 5  # 鬼ごっこプレイヤー(円)の半径
-    VELOCITY = 5  # 移動速度 [単位: ピクセル/フレーム]
+    RADIUS = 10  # 鬼ごっこプレイヤー(円)の半径
+    VELOCITY = 10  # 移動速度 [単位: ピクセル/フレーム]
 
     # 行動の種類
     ACTION_STAY = 0
@@ -46,41 +58,55 @@ class TagSimpleGame(gym.Env):
     ACTION_RIGHT = 3
     ACTION_DOWN = 4
 
+    ACTION_NAMES = {
+        0: "Stay",
+        1: "Left",
+        2: "Up",
+        3: "Right",
+        4: "Down",
+    }
+
+    # 行動の個数
+    ACTION_SPACE = 5
+
     def __init__(self) -> None:
         # 学習の設定
-        self.action_space = spaces.Discrete(5)
+        self.action_space = spaces.Discrete(self.ACTION_SPACE)
         self.observation_space = spaces.Box(low=np.float32([0, 0]), high=np.float32([400, 300]))  # type: ignore
         self.reward_range = (-1, 1)
 
         # ゲーム設定
         pygame.init()
-        self.screen = pygame.display.set_mode((self.FILED_X_MAX, self.FILED_X_MAX))
+        self.screen = pygame.display.set_mode((400, 400))
         pygame.display.set_caption("鬼ごっこの強化学習")
         self.clock = pygame.time.Clock()
+        self.font = pygame.font.Font(None, 30)
 
         # ゲームの変数
         self.limit_frame = self.FPS * self.TIME_LIMIT_SEC
         self.remain_frame = self.limit_frame
         self.demon = TagPlayer(x=0, y=0, radius=self.RADIUS, velocity=self.VELOCITY, color=(255, 0, 0))
         self.fugitive = TagPlayer(x=0, y=0, radius=self.RADIUS, color=(0, 0, 255))
+        self.selected_action = self.ACTION_STAY
 
         return
 
     def reset(self):
         self.remain_frame = self.limit_frame
+        self.selected_action = self.ACTION_STAY
 
         self.demon.set_randomize_position(
-            x_min=0 + self.demon.radius,
+            x_min=self.FIELD_X_MIN + self.demon.radius,
             x_max=self.FILED_X_MAX - self.demon.radius,
-            y_min=300 + self.demon.radius,
+            y_min=self.BOUNDARY_Y + self.demon.radius,
             y_max=self.FIELD_Y_MAX - self.demon.radius
         )
 
         self.fugitive.set_randomize_position(
-            x_min=0 + self.fugitive.radius,
+            x_min=self.FIELD_X_MIN + self.fugitive.radius,
             x_max=self.FILED_X_MAX - self.fugitive.radius,
             y_min=self.FIELD_Y_MIN + self.fugitive.radius,
-            y_max=200 - self.fugitive.radius
+            y_max=self.BOUNDARY_Y - self.fugitive.radius
         )
 
         self.screen.fill((0, 0, 0))
@@ -88,6 +114,7 @@ class TagSimpleGame(gym.Env):
         return self._calc_observations()
 
     def step(self, action):
+        self.selected_action = action
         self.remain_frame -= 1
 
         # 座標の更新
@@ -120,17 +147,18 @@ class TagSimpleGame(gym.Env):
         # 鬼が捕まえた場合
         if self.demon.radius + self.fugitive.radius > distance:
             # (観測値, 報酬, True, {})を返す
-            reward = np.float(self.remain_frame / self.limit_frame)
-            return self._calc_observations(), reward, True, {}
+            # reward = np.float(self.remain_frame / self.limit_frame)
+            reward = np.float(1)
+            return (self._calc_observations(), reward, True, {})
 
         # タイムオーバー
         if self.remain_frame <= 0:
             # (観測値, 報酬, True, {})を返す処理
             reward = np.float(-1)
-            return self._calc_observations(), reward, True, {}
+            return (self._calc_observations(), reward, True, {})
 
         # ゲーム続行中
-        return self._calc_observations(), np.float(0), False, {}
+        return (self._calc_observations(), np.float(-0.01), False, {})
 
     def render(self, mode):
         self.clock.tick(self.FPS)
@@ -139,13 +167,24 @@ class TagSimpleGame(gym.Env):
         pygame.draw.circle(self.screen, self.demon.color, self.demon.position_2d, self.demon.radius)
         pygame.draw.circle(self.screen, self.fugitive.color, self.fugitive.position_2d, self.fugitive.radius)
 
+        text_time = self.font.render(f"Time: {self.remain_frame}", True, (255, 255, 255))
+        self.screen.blit(text_time, (300, 10))
+
+        text_action = self.font.render(f"Action: {self.ACTION_NAMES[self.selected_action]}", True, (255, 255, 255))
+        self.screen.blit(text_action, (0, 10))
+
         pygame.display.update()
         return
 
     def _calc_observations(self):
         rel_position_2d = self.demon.calc_rel_position_2d(self.fugitive.position_2d)
-        observations = (rel_position_2d[0], rel_position_2d[1])
+        observations: np.ndarray = np.float32([rel_position_2d[0], rel_position_2d[1]])  # type: ignore
+
         return observations
+
+    @property
+    def len_observations(self):
+        return len(self._calc_observations())
 
 
 class TagPlayer:
@@ -178,25 +217,61 @@ class TagPlayer:
 
 
 if __name__ == "__main__":
-    episodes = 10
+    # 設定
+    ROOT_DIR_PATH = str(pathlib.Path(__file__).parent.parent)
+    MODEL_DIR_PATH = os.path.join(ROOT_DIR_PATH, "models")
+    MODEl_FILE_PATH = os.path.join(MODEL_DIR_PATH, "tag-simple.h5")
+
+    # ハイパーパラメータ
+    train_episodes = 1000
 
     env = TagSimpleGame()
+    env.reset()
 
-    for episode, _ in enumerate(range(episodes), start=1):
-        env.reset()
-        is_done = False
-        reward = 0
+    model = Sequential([
+        Flatten(input_shape=(1, env.len_observations)),
+        Dense(16, activation='relu'),
+        Dense(16, activation='relu'),
+        Dense(16, activation='relu'),
+        Dense(env.ACTION_SPACE, activation='linear')
+    ])
 
-        print("==========")
-        print(f"episode: {episode}")
+    if os.path.exists(MODEl_FILE_PATH):
+        model = load_model(MODEl_FILE_PATH)
+        print(f"モデルファイルを読み込みました : {MODEl_FILE_PATH}")
+        pass
 
-        while not is_done:
-            env.render(None)
-            action = random.randint(0, 4)
-            next_observations, reward, is_done, info = env.step(action)
-            continue
+    if not isinstance(model, Sequential):
+        print(f"モデルの型が'Sequential'ではありません : {type(model)}")
+        exit(1)
 
-        print(f"reward: {reward}")
-        print()
+    memory = SequentialMemory(limit=600, window_length=1)
+    policy = BoltzmannQPolicy()
+    dqn = DQNAgent(
+        model=model,
+        nb_actions=env.ACTION_SPACE,
+        gamma=0.98,
+        memory=memory,
+        nb_steps_warmup=10,
+        target_model_update=1e-2,
+        policy=policy
+    )
 
-        continue
+    dqn.compile(Adam(lr=1e-3), metrics=["mae"])
+
+    dqn.fit(
+        env,
+        nb_steps=env.FPS * env.TIME_LIMIT_SEC * train_episodes,
+        visualize=True,
+        verbose=1,
+        log_interval=env.FPS * env.TIME_LIMIT_SEC * 10,
+    )
+
+    # TODO: モデルの保存は最大報酬を得たときにのみ行うようにできるか検討する
+    if not os.path.exists(MODEL_DIR_PATH):
+        os.makedirs(MODEL_DIR_PATH, exist_ok=True)
+    dqn.model.save(MODEl_FILE_PATH, overwrite=True)
+
+    dqn.test(env, nb_episodes=10, visualize=True)
+
+    exit(0)
