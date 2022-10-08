@@ -15,6 +15,10 @@ fi
 
 export PIPENV_VENV_IN_PROJECT=true
 
+# Mac (BigSur) tensorflow
+# https://github.com/pypa/pipenv/issues/4578#issuecomment-757356972
+export SYSTEM_VERSION_COMPAT=1
+
 if [ -e ./Pipfile.lock ]; then
   echo "Pipfile.lock is found."
   echo "Running 'pipenv sync --dev'"
