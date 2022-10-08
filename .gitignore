@@ -142,3 +142,6 @@ dmypy.json
 
 # MacOS
 .DS_Store
+
+# models
+models/
