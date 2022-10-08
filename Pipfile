@@ -4,6 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [scripts]
+tag = "python envs/tag.py"
 
 [packages]
 tensorflow = "==2.6.0"

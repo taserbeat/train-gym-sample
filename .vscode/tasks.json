@@ -7,6 +7,13 @@
       "label": "venv-shell",
       "type": "shell",
       "command": "pipenv shell",
+      "detail": "pipenvの環境を有効にしたシェルを起動する"
+    },
+    {
+      "label": "tag",
+      "type": "shell",
+      "command": "pipenv run python ${workspaceFolder}/envs/tag.py",
+      "detail": "鬼ごっこの学習を実行する"
     },
   ]
 }
