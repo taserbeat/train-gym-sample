@@ -11,6 +11,7 @@ from rl.policy import BoltzmannQPolicy
 from rl.agents.dqn import DQNAgent
 import os
 import pathlib
+import argparse
 
 import typing as t
 
@@ -183,7 +184,7 @@ class TagSimpleGame(gym.Env):
         return observations
 
     @property
-    def len_observations(self):
+    def num_observations(self):
         return len(self._calc_observations())
 
 
@@ -216,25 +217,31 @@ class TagPlayer:
         return (self.x, self.y)
 
 
-if __name__ == "__main__":
-    # 設定
-    ROOT_DIR_PATH = str(pathlib.Path(__file__).parent.parent)
-    MODEL_DIR_PATH = os.path.join(ROOT_DIR_PATH, "models")
-    MODEl_FILE_PATH = os.path.join(MODEL_DIR_PATH, "tag-simple.h5")
+# 設定
+ROOT_DIR_PATH = str(pathlib.Path(__file__).parent.parent)
+MODEL_DIR_PATH = os.path.join(ROOT_DIR_PATH, "models")
+MODEl_FILE_PATH = os.path.join(MODEL_DIR_PATH, "tag-simple.h5")
 
-    # ハイパーパラメータ
-    train_episodes = 1000
 
-    env = TagSimpleGame()
-    env.reset()
+def load_or_create_model(num_observations: int, num_action_space: int, prioritize_load=True) -> Sequential:
+    """モデルを読み込み、または新規作成する
+
+    Args:
+        num_observations (int): 観測値の種類数
+        num_action_space (int): 行動(選択肢)の数
+        prioritize_load (bool, optional): Trueの場合はモデルファイルの読み込みを優先する
+    """
 
     model = Sequential([
-        Flatten(input_shape=(1, env.len_observations)),
+        Flatten(input_shape=(1, num_observations)),
         Dense(16, activation='relu'),
         Dense(16, activation='relu'),
         Dense(16, activation='relu'),
-        Dense(env.ACTION_SPACE, activation='linear')
+        Dense(num_action_space, activation='linear')
     ])
+
+    if not prioritize_load:
+        return model
 
     if os.path.exists(MODEl_FILE_PATH):
         model = load_model(MODEl_FILE_PATH)
@@ -242,14 +249,31 @@ if __name__ == "__main__":
         pass
 
     if not isinstance(model, Sequential):
-        print(f"モデルの型が'Sequential'ではありません : {type(model)}")
-        exit(1)
+        raise TypeError(f"モデルの型が'Sequential'ではありません : {type(model)}")
 
-    memory = SequentialMemory(limit=600, window_length=1)
+    return model
+
+
+def create_agent(model: Sequential, num_action_space: int, memory_limit=600, memory_win_length=1):
+    """DQNAgentを作成する
+
+    Args:
+        model (Sequential): モデル
+        num_action_space (int): 行動(選択肢)の数
+        memory_limit (int, optional): メモリーの上限
+        memory_win_length (int, optional): メモリーのウィンドウサイズ
+
+    Returns:
+        DQNAgent (コンパイルは未実行)
+    """
+
+    memory = SequentialMemory(limit=memory_limit, window_length=memory_win_length)
+
     policy = BoltzmannQPolicy()
+
     dqn = DQNAgent(
         model=model,
-        nb_actions=env.ACTION_SPACE,
+        nb_actions=num_action_space,
         gamma=0.98,
         memory=memory,
         nb_steps_warmup=10,
@@ -257,11 +281,26 @@ if __name__ == "__main__":
         policy=policy
     )
 
+    return dqn
+
+
+def train():
+    print("=== 学習モード ===")
+    print()
+
+    episodes = 1000
+
+    env = TagSimpleGame()
+    env.reset()
+
+    model = load_or_create_model(env.num_observations, env.ACTION_SPACE)
+
+    dqn = create_agent(model, env.ACTION_SPACE)
     dqn.compile(Adam(lr=1e-3), metrics=["mae"])
 
     dqn.fit(
         env,
-        nb_steps=env.FPS * env.TIME_LIMIT_SEC * train_episodes,
+        nb_steps=env.FPS * env.TIME_LIMIT_SEC * episodes,
         visualize=True,
         verbose=1,
         log_interval=env.FPS * env.TIME_LIMIT_SEC * 10,
@@ -272,6 +311,42 @@ if __name__ == "__main__":
         os.makedirs(MODEL_DIR_PATH, exist_ok=True)
     dqn.model.save(MODEl_FILE_PATH, overwrite=True)
 
-    dqn.test(env, nb_episodes=10, visualize=True)
+    dqn.test(env, nb_episodes=30, visualize=True)
+    return
+
+
+def test():
+    print("=== テストモード ===")
+    print()
+
+    episodes = 50
+
+    env = TagSimpleGame()
+    env.reset()
+
+    model = load_or_create_model(env.num_observations, env.ACTION_SPACE)
+
+    dqn = create_agent(model, env.ACTION_SPACE)
+    dqn.compile(Adam(lr=1e-3), metrics=["mae"])
+
+    dqn.test(env, nb_episodes=episodes, visualize=True)
+    return
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+
+    parser.add_argument("--mode", "-M", metavar="MODE", type=str, default="train", help="実行モード 'train' | 'test'")
+
+    args = parser.parse_args()
+
+    mode = args.mode
+
+    if mode == "train":
+        train()
+    elif mode == "test":
+        test()
+    else:
+        print(f"モード: '{mode}' はありません")
 
     exit(0)
