@@ -9,6 +9,9 @@ from tensorflow.keras.optimizers import Adam
 from rl.memory import SequentialMemory
 from rl.policy import BoltzmannQPolicy
 from rl.agents.dqn import DQNAgent
+from keras.callbacks import History
+import matplotlib.pyplot as plt
+from matplotlib.ticker import MaxNLocator
 import os
 import pathlib
 import argparse
@@ -286,6 +289,33 @@ def create_agent(model: Sequential, num_action_space: int, memory_limit=600, mem
     return dqn
 
 
+def plot_rewards(history: History):
+    """
+    報酬の獲得履歴をグラフ化する (TODO: 表示されたグラフを閉じるとフリーズするのを解決)
+
+    Args:
+        history (History): 学習結果を格納したHistoryオブジェクト
+    """
+
+    episode_reward: t.Optional[t.List[float]] = history.history.get("episode_reward")
+    if episode_reward is None:
+        print("'episode_reward' が存在しません")
+        return
+
+    _, ax = plt.subplots()
+
+    ax.plot(episode_reward)
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    ax.set_title("Train Result")
+    ax.set_xlabel("Episode")
+    ax.set_ylabel("Reward")
+
+    plt.show()
+
+    return
+
+
 def train(episode: t.Optional[int] = None):
     print("=== 学習モード ===")
     print()
@@ -301,7 +331,7 @@ def train(episode: t.Optional[int] = None):
     dqn = create_agent(model, env.ACTION_SPACE)
     dqn.compile(Adam(lr=1e-3), metrics=["mae"])
 
-    dqn.fit(
+    history: History = dqn.fit(
         env,
         nb_steps=env.FPS * env.TIME_LIMIT_SEC * episode,
         visualize=True,
@@ -315,6 +345,9 @@ def train(episode: t.Optional[int] = None):
     if not os.path.exists(MODEL_DIR_PATH):
         os.makedirs(MODEL_DIR_PATH, exist_ok=True)
     dqn.model.save(MODEl_FILE_PATH, overwrite=True)
+
+    print(history.history.get("episode_reward"))
+
     return
 
 
