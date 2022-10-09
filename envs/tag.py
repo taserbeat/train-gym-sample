@@ -309,8 +309,6 @@ def train(episode: t.Optional[int] = None):
     if not os.path.exists(MODEL_DIR_PATH):
         os.makedirs(MODEL_DIR_PATH, exist_ok=True)
     dqn.model.save(MODEl_FILE_PATH, overwrite=True)
-
-    dqn.test(env, nb_episodes=30, visualize=True)
     return
 
 
