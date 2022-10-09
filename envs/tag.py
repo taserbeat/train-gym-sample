@@ -282,11 +282,12 @@ def create_agent(model: Sequential, num_action_space: int, memory_limit=600, mem
     return dqn
 
 
-def train():
+def train(episode: t.Optional[int] = None):
     print("=== 学習モード ===")
     print()
 
-    episodes = 1000
+    if episode is None:
+        episode = 1000
 
     env = TagSimpleGame()
     env.reset()
@@ -298,7 +299,7 @@ def train():
 
     dqn.fit(
         env,
-        nb_steps=env.FPS * env.TIME_LIMIT_SEC * episodes,
+        nb_steps=env.FPS * env.TIME_LIMIT_SEC * episode,
         visualize=True,
         verbose=1,
         log_interval=env.FPS * env.TIME_LIMIT_SEC * 10,
@@ -313,11 +314,12 @@ def train():
     return
 
 
-def test():
+def test(episode: t.Optional[int] = None):
     print("=== テストモード ===")
     print()
 
-    episodes = 50
+    if episode is None:
+        episode = 50
 
     env = TagSimpleGame()
     env.reset()
@@ -327,7 +329,7 @@ def test():
     dqn = create_agent(model, env.ACTION_SPACE)
     dqn.compile(Adam(lr=1e-3), metrics=["mae"])
 
-    dqn.test(env, nb_episodes=episodes, visualize=True)
+    dqn.test(env, nb_episodes=episode, visualize=True)
     return
 
 
@@ -335,15 +337,17 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--mode", "-M", metavar="MODE", type=str, default="train", help="実行モード 'train' | 'test'")
+    parser.add_argument("--episode", "-E", metavar="N", type=int, default=None, help="繰り返すエピソード数")
 
     args = parser.parse_args()
 
-    mode = args.mode
+    mode: str = args.mode
+    episode: t.Optional[int] = args.episode
 
     if mode == "train":
-        train()
+        train(episode=episode)
     elif mode == "test":
-        test()
+        test(episode=episode)
     else:
         print(f"モード: '{mode}' はありません")
 
