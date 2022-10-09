@@ -19,6 +19,35 @@ import argparse
 import typing as t
 
 
+class TagPlayer:
+    def __init__(self, x: int, y: int, radius: int = 5, velocity: int = 0, color: t.Tuple[int, int, int] = (255, 0, 0)) -> None:
+        self.x = x
+        self.y = y
+        self.radius = radius
+        self.velocity = velocity
+        self.color = color
+
+        return
+
+    def set_position(self, x: int, y: int):
+        self.x, self.y = x, y
+        return
+
+    def set_randomize_position(self, x_min: int, y_min: int, x_max: int, y_max: int):
+        new_x, new_y = random.randint(x_min, x_max), random.randint(y_min, y_max)
+        self.x, self.y = new_x, new_y
+        return
+
+    def calc_rel_position_2d(self, target: t.Tuple[int, int]):
+        x_rel = target[0] - self.x
+        y_rel = target[1] - self.y
+        return (x_rel, y_rel)
+
+    @property
+    def position_2d(self):
+        return (self.x, self.y)
+
+
 class TagSimpleGame(gym.Env):
     """
     簡単な鬼ごっこをするゲーム環境
@@ -71,7 +100,7 @@ class TagSimpleGame(gym.Env):
     # 行動の個数
     ACTION_SPACE = 5
 
-    def __init__(self) -> None:
+    def __init__(self, demon: t.Optional[TagPlayer] = None) -> None:
         # 学習の設定
         self.action_space = spaces.Discrete(self.ACTION_SPACE)
         self.observation_space = spaces.Box(low=np.float32([0, 0]), high=np.float32([400, 300]))  # type: ignore
@@ -88,6 +117,9 @@ class TagSimpleGame(gym.Env):
         self.limit_frame = self.FPS * self.TIME_LIMIT_SEC
         self.remain_frame = self.limit_frame
         self.demon = TagPlayer(x=0, y=0, radius=self.RADIUS, velocity=self.VELOCITY, color=(255, 0, 0))
+        if demon is not None:
+            self.demon = demon
+
         self.fugitive = TagPlayer(x=0, y=0, radius=self.RADIUS, color=(0, 0, 255))
         self.selected_action = self.ACTION_STAY
 
@@ -116,6 +148,8 @@ class TagSimpleGame(gym.Env):
         return self._calc_observations()
 
     def step(self, action):
+        pygame.event.get()
+
         self.selected_action = action
         self.remain_frame -= 1
 
@@ -191,35 +225,6 @@ class TagSimpleGame(gym.Env):
     @property
     def num_observations(self):
         return len(self._calc_observations())
-
-
-class TagPlayer:
-    def __init__(self, x: int, y: int, radius: int = 5, velocity: int = 0, color: t.Tuple[int, int, int] = (255, 0, 0)) -> None:
-        self.x = x
-        self.y = y
-        self.radius = radius
-        self.velocity = velocity
-        self.color = color
-
-        return
-
-    def set_position(self, x: int, y: int):
-        self.x, self.y = x, y
-        return
-
-    def set_randomize_position(self, x_min: int, y_min: int, x_max: int, y_max: int):
-        new_x, new_y = random.randint(x_min, x_max), random.randint(y_min, y_max)
-        self.x, self.y = new_x, new_y
-        return
-
-    def calc_rel_position_2d(self, target: t.Tuple[int, int]):
-        x_rel = target[0] - self.x
-        y_rel = target[1] - self.y
-        return (x_rel, y_rel)
-
-    @property
-    def position_2d(self):
-        return (self.x, self.y)
 
 
 # 設定
