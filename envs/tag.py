@@ -342,9 +342,9 @@ if __name__ == "__main__":
     mode: str = args.mode
     episode: t.Optional[int] = args.episode
 
-    if mode == "train":
+    if mode.lower() == "train":
         train(episode=episode)
-    elif mode == "test":
+    elif mode.lower() == "test":
         test(episode=episode)
     else:
         print(f"モード: '{mode}' はありません")
