@@ -44,8 +44,6 @@ class TagSimpleGame(gym.Env):
     FIELD_X_MIN, FILED_X_MAX = 0, 100  # フィールドのx座標範囲
     FIELD_Y_MIN, FIELD_Y_MAX = 100, 200  # フィールドのy座標範囲
 
-    BOUNDARY_Y = int((FIELD_Y_MAX + FIELD_Y_MIN) / 2)  # 鬼はこのy座標以上で初期化され、逃走者はこのy座標以下で初期化される
-
     FPS = 60  # ゲームのフレームレート
     TIME_LIMIT_SEC = 10  # 1ゲームあたりの制限時間 [単位: 秒]
 
@@ -99,7 +97,7 @@ class TagSimpleGame(gym.Env):
         self.demon.set_randomize_position(
             x_min=self.FIELD_X_MIN + self.demon.radius,
             x_max=self.FILED_X_MAX - self.demon.radius,
-            y_min=self.BOUNDARY_Y + self.demon.radius,
+            y_min=self.FIELD_Y_MIN + self.demon.radius,
             y_max=self.FIELD_Y_MAX - self.demon.radius
         )
 
@@ -107,7 +105,7 @@ class TagSimpleGame(gym.Env):
             x_min=self.FIELD_X_MIN + self.fugitive.radius,
             x_max=self.FILED_X_MAX - self.fugitive.radius,
             y_min=self.FIELD_Y_MIN + self.fugitive.radius,
-            y_max=self.BOUNDARY_Y - self.fugitive.radius
+            y_max=self.FIELD_Y_MAX - self.fugitive.radius
         )
 
         self.screen.fill((0, 0, 0))
