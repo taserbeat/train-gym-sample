@@ -175,6 +175,10 @@ class TagSimpleGame(gym.Env):
         pygame.display.update()
         return
 
+    def close(self) -> None:
+        pygame.quit()
+        return
+
     def _calc_observations(self):
         rel_position_2d = self.demon.calc_rel_position_2d(self.fugitive.position_2d)
         observations: np.ndarray = np.float32([rel_position_2d[0], rel_position_2d[1]])  # type: ignore
@@ -305,6 +309,8 @@ def train(episode: t.Optional[int] = None):
         log_interval=env.FPS * env.TIME_LIMIT_SEC * 10,
     )
 
+    env.close()
+
     # TODO: モデルの保存は最大報酬を得たときにのみ行うようにできるか検討する
     if not os.path.exists(MODEL_DIR_PATH):
         os.makedirs(MODEL_DIR_PATH, exist_ok=True)
@@ -328,6 +334,9 @@ def test(episode: t.Optional[int] = None):
     dqn.compile(Adam(lr=1e-3), metrics=["mae"])
 
     dqn.test(env, nb_episodes=episode, visualize=True)
+
+    env.close()
+
     return
 
 
