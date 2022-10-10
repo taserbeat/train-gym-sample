@@ -371,7 +371,9 @@ def train(episode: t.Optional[int] = None):
         os.makedirs(MODEL_DIR_PATH, exist_ok=True)
     dqn.model.save(MODEl_FILE_PATH, overwrite=True)
 
-    print(history.history.get("episode_reward"))
+    episode_reward: t.Optional[t.List[float]] = history.history.get("episode_reward")
+    if episode_reward is not None:
+        print(episode_reward[-10:])
 
     return
 
