@@ -341,7 +341,7 @@ def plot_rewards(history: History):
     return
 
 
-def train(episode: t.Optional[int] = None):
+def train(episode: t.Optional[int] = None, visualize=True):
     print("=== 学習モード ===")
     print()
 
@@ -359,7 +359,7 @@ def train(episode: t.Optional[int] = None):
     history: History = dqn.fit(
         env,
         nb_steps=env.FPS * env.TIME_LIMIT_SEC * episode,
-        visualize=True,
+        visualize=visualize,
         verbose=1,
         log_interval=env.FPS * env.TIME_LIMIT_SEC * 10,
     )
@@ -378,7 +378,7 @@ def train(episode: t.Optional[int] = None):
     return
 
 
-def test(episode: t.Optional[int] = None):
+def test(episode: t.Optional[int] = None, visualize=True):
     print("=== テストモード ===")
     print()
 
@@ -393,7 +393,7 @@ def test(episode: t.Optional[int] = None):
     dqn = create_agent(model, env.ACTION_SPACE)
     dqn.compile(Adam(lr=1e-3), metrics=["mae"])
 
-    dqn.test(env, nb_episodes=episode, visualize=True)
+    dqn.test(env, nb_episodes=episode, visualize=visualize)
 
     env.close()
 
@@ -405,16 +405,20 @@ if __name__ == "__main__":
 
     parser.add_argument("--mode", "-M", metavar="MODE", type=str, default="train", help="実行モード 'train' | 'test'")
     parser.add_argument("--episode", "-E", metavar="N", type=int, default=None, help="繰り返すエピソード数")
+    parser.add_argument("--no-render", "-N", action="store_true", help="画面の描画を行わない")
 
     args = parser.parse_args()
 
     mode: str = args.mode
     episode: t.Optional[int] = args.episode
+    no_render: bool = args.no_render
+
+    visualize = not no_render
 
     if mode.lower() == "train":
-        train(episode=episode)
+        train(episode=episode, visualize=visualize)
     elif mode.lower() == "test":
-        test(episode=episode)
+        test(episode=episode, visualize=visualize)
     else:
         print(f"モード: '{mode}' はありません")
 
