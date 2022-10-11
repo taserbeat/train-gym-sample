@@ -66,14 +66,16 @@ class TagSimpleGame(gym.Env):
     観測:
         鬼は逃走役までの相対座標を観測できる
 
-        (x_rel, y_rel)
+        また、各移動先(左、上、右、下)の情報(壁であれば1、移動可能であれば0)を観測できる
+
+        (x_rel, y_rel, left_wall, up_wall, right_wall, down_wall)
 
     報酬:
         TODO: 追記
     """
 
     # 共通パラメータ
-    FIELD_X_MIN, FILED_X_MAX = 0, 100  # フィールドのx座標範囲
+    FIELD_X_MIN, FIELD_X_MAX = 0, 100  # フィールドのx座標範囲
     FIELD_Y_MIN, FIELD_Y_MAX = 100, 200  # フィールドのy座標範囲
 
     FPS = 60  # ゲームのフレームレート
@@ -103,7 +105,7 @@ class TagSimpleGame(gym.Env):
     def __init__(self, demon: t.Optional[TagPlayer] = None) -> None:
         # 学習の設定
         self.action_space = spaces.Discrete(self.ACTION_SPACE)
-        self.observation_space = spaces.Box(low=np.float32([0, 0]), high=np.float32([400, 300]))  # type: ignore
+        self.observation_space = spaces.Box(low=np.float32([0, 0, 0, 0, 0, 0]), high=np.float32([400, 300, 1, 1, 1, 1]))  # type: ignore
         self.reward_range = (-1, 1)
 
         # ゲーム設定
@@ -131,14 +133,14 @@ class TagSimpleGame(gym.Env):
 
         self.demon.set_randomize_position(
             x_min=self.FIELD_X_MIN + self.demon.radius,
-            x_max=self.FILED_X_MAX - self.demon.radius,
+            x_max=self.FIELD_X_MAX - self.demon.radius,
             y_min=self.FIELD_Y_MIN + self.demon.radius,
             y_max=self.FIELD_Y_MAX - self.demon.radius
         )
 
         self.fugitive.set_randomize_position(
             x_min=self.FIELD_X_MIN + self.fugitive.radius,
-            x_max=self.FILED_X_MAX - self.fugitive.radius,
+            x_max=self.FIELD_X_MAX - self.fugitive.radius,
             y_min=self.FIELD_Y_MIN + self.fugitive.radius,
             y_max=self.FIELD_Y_MAX - self.fugitive.radius
         )
@@ -168,8 +170,8 @@ class TagSimpleGame(gym.Env):
         # 座標の修正
         if self.demon.x - self.demon.radius < self.FIELD_X_MIN:
             self.demon.x = self.FIELD_X_MIN + self.demon.radius
-        if self.demon.x + self.demon.radius > self.FILED_X_MAX:
-            self.demon.x = self.FILED_X_MAX - self.demon.radius
+        if self.demon.x + self.demon.radius > self.FIELD_X_MAX:
+            self.demon.x = self.FIELD_X_MAX - self.demon.radius
         if self.demon.y - self.demon.radius < self.FIELD_Y_MIN:
             self.demon.y = self.FIELD_Y_MIN + self.demon.radius
         if self.demon.y + self.demon.radius > self.FIELD_Y_MAX:
@@ -209,6 +211,18 @@ class TagSimpleGame(gym.Env):
         text_action = self.font.render(f"Action: {self.ACTION_NAMES[self.selected_action]}", True, (255, 255, 255))
         self.screen.blit(text_action, (0, 10))
 
+        observations = self._calc_observations()
+        left_wall, up_wall, right_wall, down_wall = observations[2:6]
+
+        if left_wall > 0:
+            pygame.draw.rect(self.screen, (255, 0, 0), (140, 20, 20, 5))
+        if up_wall > 0:
+            pygame.draw.rect(self.screen, (255, 0, 0), (150, 10, 20, 5))
+        if right_wall > 0:
+            pygame.draw.rect(self.screen, (255, 0, 0), (160, 20, 20, 5))
+        if down_wall > 0:
+            pygame.draw.rect(self.screen, (255, 0, 0), (150, 30, 20, 5))
+
         pygame.display.update()
         return
 
@@ -217,8 +231,14 @@ class TagSimpleGame(gym.Env):
         return
 
     def _calc_observations(self):
-        rel_position_2d = self.demon.calc_rel_position_2d(self.fugitive.position_2d)
-        observations: np.ndarray = np.float32([rel_position_2d[0], rel_position_2d[1]])  # type: ignore
+        rel_pos_2d = self.demon.calc_rel_position_2d(self.fugitive.position_2d)
+
+        left_wall = 1 if self.demon.x - self.demon.radius <= self.FIELD_X_MIN else 0
+        up_wall = 1 if self.demon.y - self.demon.radius <= self.FIELD_Y_MIN else 0
+        right_wall = 1 if self.demon.x + self.demon.radius >= self.FIELD_X_MAX else 0
+        down_wall = 1 if self.demon.y + self.demon.radius >= self.FIELD_Y_MAX else 0
+
+        observations: np.ndarray = np.float32([rel_pos_2d[0], rel_pos_2d[1], left_wall, up_wall, right_wall, down_wall])  # type: ignore
 
         return observations
 
@@ -321,7 +341,7 @@ def plot_rewards(history: History):
     return
 
 
-def train(episode: t.Optional[int] = None):
+def train(episode: t.Optional[int] = None, visualize=True):
     print("=== 学習モード ===")
     print()
 
@@ -334,12 +354,12 @@ def train(episode: t.Optional[int] = None):
     model = load_or_create_model(env.num_observations, env.ACTION_SPACE)
 
     dqn = create_agent(model, env.ACTION_SPACE)
-    dqn.compile(Adam(lr=1e-3), metrics=["mae"])
+    dqn.compile(Adam(learning_rate=1e-3), metrics=["mae"])
 
     history: History = dqn.fit(
         env,
         nb_steps=env.FPS * env.TIME_LIMIT_SEC * episode,
-        visualize=True,
+        visualize=visualize,
         verbose=1,
         log_interval=env.FPS * env.TIME_LIMIT_SEC * 10,
     )
@@ -351,12 +371,14 @@ def train(episode: t.Optional[int] = None):
         os.makedirs(MODEL_DIR_PATH, exist_ok=True)
     dqn.model.save(MODEl_FILE_PATH, overwrite=True)
 
-    print(history.history.get("episode_reward"))
+    episode_reward: t.Optional[t.List[float]] = history.history.get("episode_reward")
+    if episode_reward is not None:
+        print(episode_reward[-10:])
 
     return
 
 
-def test(episode: t.Optional[int] = None):
+def test(episode: t.Optional[int] = None, visualize=True):
     print("=== テストモード ===")
     print()
 
@@ -371,7 +393,7 @@ def test(episode: t.Optional[int] = None):
     dqn = create_agent(model, env.ACTION_SPACE)
     dqn.compile(Adam(lr=1e-3), metrics=["mae"])
 
-    dqn.test(env, nb_episodes=episode, visualize=True)
+    dqn.test(env, nb_episodes=episode, visualize=visualize)
 
     env.close()
 
@@ -381,18 +403,22 @@ def test(episode: t.Optional[int] = None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--mode", "-M", metavar="MODE", type=str, default="train", help="実行モード 'train' | 'test'")
-    parser.add_argument("--episode", "-E", metavar="N", type=int, default=None, help="繰り返すエピソード数")
+    parser.add_argument("--mode", "-M", type=str, default="train", help="実行モード 'train' | 'test'")
+    parser.add_argument("--episode", "-E", type=int, default=None, help="繰り返すエピソード数")
+    parser.add_argument("--no-render", "-N", action="store_true", help="画面の描画を行わない")
 
     args = parser.parse_args()
 
     mode: str = args.mode
     episode: t.Optional[int] = args.episode
+    no_render: bool = args.no_render
+
+    visualize = not no_render
 
     if mode.lower() == "train":
-        train(episode=episode)
+        train(episode=episode, visualize=visualize)
     elif mode.lower() == "test":
-        test(episode=episode)
+        test(episode=episode, visualize=visualize)
     else:
         print(f"モード: '{mode}' はありません")
 
