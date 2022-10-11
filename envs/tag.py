@@ -403,8 +403,8 @@ def test(episode: t.Optional[int] = None, visualize=True):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--mode", "-M", metavar="MODE", type=str, default="train", help="実行モード 'train' | 'test'")
-    parser.add_argument("--episode", "-E", metavar="N", type=int, default=None, help="繰り返すエピソード数")
+    parser.add_argument("--mode", "-M", type=str, default="train", help="実行モード 'train' | 'test'")
+    parser.add_argument("--episode", "-E", type=int, default=None, help="繰り返すエピソード数")
     parser.add_argument("--no-render", "-N", action="store_true", help="画面の描画を行わない")
 
     args = parser.parse_args()
