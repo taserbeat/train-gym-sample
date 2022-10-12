@@ -64,11 +64,9 @@ class TagSimpleGame(gym.Env):
         上下左右の4方向への移動、またはその場に留まる
 
     観測:
-        鬼は逃走役までの相対座標を観測できる
+        鬼は自身の(x, y)座標と逃走役の(x, y)座標を観測できる
 
-        また、各移動先(左、上、右、下)の情報(壁であれば1、移動可能であれば0)を観測できる
-
-        (x_rel, y_rel, left_wall, up_wall, right_wall, down_wall)
+        (x_demon, y_demon, x_fugitive, y_fugitive)
 
     報酬:
         TODO: 追記
@@ -103,11 +101,6 @@ class TagSimpleGame(gym.Env):
     ACTION_SPACE = 5
 
     def __init__(self, demon: t.Optional[TagPlayer] = None) -> None:
-        # 学習の設定
-        self.action_space = spaces.Discrete(self.ACTION_SPACE)
-        self.observation_space = spaces.Box(low=np.float32([0, 0, 0, 0, 0, 0]), high=np.float32([400, 300, 1, 1, 1, 1]))  # type: ignore
-        self.reward_range = (-1, 1)
-
         # ゲーム設定
         pygame.init()
         self.screen = pygame.display.set_mode((400, 400))
@@ -124,6 +117,24 @@ class TagSimpleGame(gym.Env):
 
         self.fugitive = TagPlayer(x=0, y=0, radius=self.RADIUS, color=(0, 0, 255))
         self.selected_action = self.ACTION_STAY
+
+        # 学習の設定
+        self.action_space = spaces.Discrete(self.ACTION_SPACE)
+        self.observation_space = spaces.Box(
+            low=np.float32([
+                self.FIELD_X_MIN + self.demon.radius,  # Min value of demon's x
+                self.FIELD_Y_MIN + self.demon.radius,  # Min value of demon's y
+                self.FIELD_X_MIN + self.fugitive.radius,  # Min value of fugitive's x
+                self.FIELD_Y_MIN + self.fugitive.radius  # Min value of fugitive's y
+            ]),
+            high=np.float32([
+                self.FIELD_X_MAX - self.demon.radius,  # Max value of demon's x
+                self.FIELD_Y_MAX - self.demon.radius,  # Max value of demon's y
+                self.FIELD_X_MAX - self.fugitive.radius,  # Max value of fugitive's x
+                self.FIELD_Y_MAX - self.fugitive.radius  # Max value of fugitive's y
+            ])
+        )
+        self.reward_range = [-1., 1.]
 
         return
 
@@ -211,18 +222,6 @@ class TagSimpleGame(gym.Env):
         text_action = self.font.render(f"Action: {self.ACTION_NAMES[self.selected_action]}", True, (255, 255, 255))
         self.screen.blit(text_action, (0, 10))
 
-        observations = self._calc_observations()
-        left_wall, up_wall, right_wall, down_wall = observations[2:6]
-
-        if left_wall > 0:
-            pygame.draw.rect(self.screen, (255, 0, 0), (140, 20, 20, 5))
-        if up_wall > 0:
-            pygame.draw.rect(self.screen, (255, 0, 0), (150, 10, 20, 5))
-        if right_wall > 0:
-            pygame.draw.rect(self.screen, (255, 0, 0), (160, 20, 20, 5))
-        if down_wall > 0:
-            pygame.draw.rect(self.screen, (255, 0, 0), (150, 30, 20, 5))
-
         pygame.display.update()
         return
 
@@ -231,14 +230,13 @@ class TagSimpleGame(gym.Env):
         return
 
     def _calc_observations(self):
-        rel_pos_2d = self.demon.calc_rel_position_2d(self.fugitive.position_2d)
+        """
+        観測値を返す
+        """
 
-        left_wall = 1 if self.demon.x - self.demon.radius <= self.FIELD_X_MIN else 0
-        up_wall = 1 if self.demon.y - self.demon.radius <= self.FIELD_Y_MIN else 0
-        right_wall = 1 if self.demon.x + self.demon.radius >= self.FIELD_X_MAX else 0
-        down_wall = 1 if self.demon.y + self.demon.radius >= self.FIELD_Y_MAX else 0
-
-        observations: np.ndarray = np.float32([rel_pos_2d[0], rel_pos_2d[1], left_wall, up_wall, right_wall, down_wall])  # type: ignore
+        observations: np.ndarray = np.float32([
+            self.demon.x, self.demon.y, self.fugitive.x, self.fugitive.y
+        ])
 
         return observations
 
