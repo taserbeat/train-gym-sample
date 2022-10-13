@@ -389,7 +389,7 @@ def test(episode: t.Optional[int] = None, visualize=True):
     model = load_or_create_model(env.num_observations, env.ACTION_SPACE)
 
     dqn = create_agent(model, env.ACTION_SPACE)
-    dqn.compile(Adam(lr=1e-3), metrics=["mae"])
+    dqn.compile(Adam(learning_rate=1e-3), metrics=["mae"])
 
     dqn.test(env, nb_episodes=episode, visualize=visualize)
 
