@@ -69,12 +69,14 @@ class TagSimpleGame(gym.Env):
         (x_demon, y_demon, x_fugitive, y_fugitive)
 
     報酬:
-        TODO: 追記
+        - 制限時間内に逃走役を捕まえた場合は、鬼役に+1.0の報酬を与える
+        - 制限時間内に逃走役を捕まえられなかった場合は、鬼役に-1.0の報酬を与える
+        - 毎フレームごとに鬼役と逃走役の距離を計算し、距離が近づけば+0.01、変化なしの場合は-0.02、遠ざかれば-0.02の報酬を与える
     """
 
     # 共通パラメータ
-    FIELD_X_MIN, FIELD_X_MAX = 0, 100  # フィールドのx座標範囲
-    FIELD_Y_MIN, FIELD_Y_MAX = 100, 200  # フィールドのy座標範囲
+    FIELD_X_MIN, FIELD_X_MAX = 0, 400  # フィールドのx座標範囲
+    FIELD_Y_MIN, FIELD_Y_MAX = 100, 400  # フィールドのy座標範囲
 
     FPS = 60  # ゲームのフレームレート
     TIME_LIMIT_SEC = 10  # 1ゲームあたりの制限時間 [単位: 秒]
@@ -117,6 +119,7 @@ class TagSimpleGame(gym.Env):
 
         self.fugitive = TagPlayer(x=0, y=0, radius=self.RADIUS, color=(0, 0, 255))
         self.selected_action = self.ACTION_STAY
+        self.previous_distance = 0.0
 
         # 学習の設定
         self.action_space = spaces.Discrete(self.ACTION_SPACE)
@@ -156,6 +159,9 @@ class TagSimpleGame(gym.Env):
             y_max=self.FIELD_Y_MAX - self.fugitive.radius
         )
 
+        distance = self._calc_distance()
+        self.previous_distance = distance
+
         self.screen.fill((0, 0, 0))
 
         return self._calc_observations()
@@ -189,25 +195,31 @@ class TagSimpleGame(gym.Env):
             self.demon.y = self.FIELD_Y_MAX - self.demon.radius
 
         # 判定処理のための計算
-        # 鬼を基準とした逃走者の相対座標、鬼と逃走者の距離
-        position_2d_rel = self.demon.calc_rel_position_2d(self.fugitive.position_2d)
-        distance = np.linalg.norm(position_2d_rel)
+        # 鬼と逃走者の距離
+        distance = self._calc_distance()
 
         # 鬼が捕まえた場合
         if self.demon.radius + self.fugitive.radius > distance:
             # (観測値, 報酬, True, {})を返す
-            # reward = np.float(self.remain_frame / self.limit_frame)
-            reward = np.float(1)
-            return (self._calc_observations(), reward, True, {})
+            return (self._calc_observations(), np.float(1), True, {})
 
         # タイムオーバー
         if self.remain_frame <= 0:
             # (観測値, 報酬, True, {})を返す処理
-            reward = np.float(-1)
-            return (self._calc_observations(), reward, True, {})
+            return (self._calc_observations(), np.float(-1), True, {})
 
         # ゲーム続行中
-        return (self._calc_observations(), np.float(-0.01), False, {})
+        reward = -0.02
+        if distance < self.previous_distance:
+            # 前フレームよりも鬼役と逃走役の距離が近くなった場合
+            reward = 0.01
+        elif distance > self.previous_distance:
+            # 前フレームよりも鬼役と逃走役の距離が遠ざかった場合
+            reward = -0.02
+
+        self.previous_distance = distance
+
+        return (self._calc_observations(), np.float(reward), False, {})
 
     def render(self, mode):
         self.clock.tick(self.FPS)
@@ -228,6 +240,13 @@ class TagSimpleGame(gym.Env):
     def close(self) -> None:
         pygame.quit()
         return
+
+    def _calc_distance(self):
+        demon_position = np.array([self.demon.x, self.demon.y])
+        fugitive_position = np.array([self.fugitive.x, self.fugitive.y])
+        distance: float = np.linalg.norm(fugitive_position - demon_position)
+
+        return distance
 
     def _calc_observations(self):
         """
